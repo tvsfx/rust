@@ -258,7 +258,7 @@
 #![cfg_attr(test, feature(internal_output_capture, print_internals, update_panic_count, rt))]
 #![cfg_attr(
     all(target_vendor = "fortanix", target_env = "sgx"),
-    feature(slice_index_methods, coerce_unsized, sgx_platform)
+    feature(slice_index_methods, coerce_unsized, sgx_platform, unsafe_pinned)
 )]
 #![cfg_attr(all(test, target_os = "uefi"), feature(uefi_std))]
 #![cfg_attr(target_family = "wasm", feature(stdarch_wasm_atomic_wait))]

@@ -4,10 +4,10 @@ use fortanix_sgx_abi::*;
 
 use super::super::mem::{is_enclave_range, is_user_range};
 use crate::arch::asm;
-use crate::cell::UnsafeCell;
 use crate::convert::TryInto;
 use crate::mem::{self, ManuallyDrop, MaybeUninit};
 use crate::ops::{CoerceUnsized, Deref, DerefMut, Index, IndexMut};
+use crate::pin::UnsafePinned;
 use crate::ptr::{self, NonNull};
 use crate::slice::SliceIndex;
 use crate::{cmp, intrinsics, slice};
@@ -168,7 +168,13 @@ unsafe impl<T: UserSafeSized> UserSafe for [T] {
 /// user memory, an immutable reference for reading from user memory.
 #[unstable(feature = "sgx_platform", issue = "56975")]
 #[repr(transparent)]
-pub struct UserRef<T: ?Sized>(UnsafeCell<T>);
+pub struct UserRef<T: ?Sized>(UnsafePinned<T>);
+
+/// [UserRef] does not use [UnsafePinned] as the target of a self-reference,
+/// nor does it allow mutable and immutable references to coexist.
+#[unstable(feature = "sgx_platform", issue = "56975")]
+impl<T> Unpin for UserRef<T> where T: Unpin + ?Sized {}
+
 /// An owned type in userspace memory. `User<T>` is equivalent to `Box<T>` in
 /// enclave memory. Access to the memory is only allowed by copying to avoid
 /// TOCTTOU issues. The user memory will be freed when the value is dropped.
