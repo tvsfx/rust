@@ -8,9 +8,9 @@ use crate::cell::UnsafeCell;
 use crate::convert::TryInto;
 use crate::marker::{PhantomData, Unsize};
 use crate::mem::{self, ManuallyDrop, MaybeUninit};
-use crate::ops::{CoerceUnsized, Deref, DerefMut, Index, IndexMut};
+use crate::ops::{CoerceUnsized, Deref, DerefMut, Index, IndexMut, RangeBounds};
 use crate::ptr::{self, NonNull};
-use crate::slice::SliceIndex;
+use crate::slice::{SliceIndex, try_range};
 use crate::{cmp, intrinsics, slice};
 
 /// A type that can be safely read from or written to userspace.
@@ -877,17 +877,15 @@ where
     /// Implemented as an instance method rather than an [std::ops::Index] trait instance, since the
     /// returned [UserRef] is owned.
     #[inline]
-    pub fn index<I>(self, index: I) -> UserRef<'a, I::Output>
+    pub fn index<I>(self, index: I) -> Self
     where
-        I: SliceIndex<[T]>,
-        I::Output: UserSafe,
+        I: RangeBounds<usize>,
     {
-        unsafe {
-            if let Some(slice) = index.get_raw(self.as_raw_ptr()) {
-                UserRef::from_ptr(slice)
-            } else {
-                rtabort!("index out of range for user slice");
-            }
+        if let Some(range) = try_range(index, ..self.len()) {
+            // SAFETY: bounds checking is performed by `try_range`
+            unsafe { UserRef::from_ptr(range.get_unchecked(self.as_raw_ptr())) }
+        } else {
+            rtabort!("index out of range for user slice");
         }
     }
 }
@@ -902,17 +900,15 @@ where
     /// Implemented as an instance method rather than an [std::ops::IndexMut] trait instance, since the
     /// returned [UserMut] is owned.
     #[inline]
-    pub fn index_mut<'b, I>(self, index: I) -> UserMut<'a, I::Output>
+    pub fn index_mut<'b, I>(self, index: I) -> Self
     where
-        I: SliceIndex<[T]>,
-        I::Output: UserSafe,
+        I: RangeBounds<usize>,
     {
-        unsafe {
-            if let Some(slice) = index.get_raw_mut(self.as_raw_mut_ptr()) {
-                UserMut::from_mut_ptr(slice)
-            } else {
-                rtabort!("index out of range for user slice");
-            }
+        if let Some(range) = try_range(index, ..self.coerce_shared().len()) {
+            // SAFETY: bounds checking is performed by `try_range`
+            unsafe { UserMut::from_mut_ptr(range.get_unchecked_mut(self.as_raw_mut_ptr())) }
+        } else {
+            rtabort!("index out of range for user slice");
         }
     }
 }
